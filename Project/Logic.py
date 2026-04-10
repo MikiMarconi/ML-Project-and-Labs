@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-import scipy.linalg
+import scipy
 
 def load():
     filename = sys.argv[1]
@@ -112,3 +112,68 @@ def loglikelihood(X, mu, C):
     Y = logpdf_GAU_ND(X, mu, C)
     return np.sum(Y)
 
+def binaryClassifierMVG(DTR, LTR, DTE):
+    DTRBinary0 = DTR[:, LTR == 0]
+    DTRBinary1 = DTR[:, LTR == 1]
+
+    DB0, mu0 = normalization(DTRBinary0)
+    DB1, mu1 = normalization(DTRBinary1)
+
+    CB0= covariance(DB0)
+    CB1 = covariance(DB1)
+
+    Y0 = logpdf_GAU_ND(DTE, mu0, CB0)
+    Y1 = logpdf_GAU_ND(DTE, mu1, CB1)
+    LLR = Y1 - Y0
+
+    return LLR, CB0, CB1
+
+def binaryClassifierTCG(DTR, LTR, DTE, LTE):
+    DTR0 = DTR[:, LTR == 0]
+    DTR1 = DTR[:, LTR == 1]
+
+    DC0, mu0 = normalization(DTR0)
+    DC1, mu1 = normalization(DTR1)
+
+    CM0= covariance(DC0)
+    CM1 = covariance(DC1)
+    CM_tied  = (1/DTR.shape[1]) * ((DTR0.shape[1] * CM0) + (DTR1.shape[1] * CM1))
+    
+    Y0 = logpdf_GAU_ND(DTE, mu0, CM_tied)
+    Y1 = logpdf_GAU_ND(DTE, mu1, CM_tied)
+    LLR = Y1 - Y0
+    return LLR
+
+def binaryClassifierNBG(DTR, LTR, DTE):
+
+    DTR0 = DTR[:, LTR == 0]
+    DTR1 = DTR[:, LTR == 1]
+
+    DC0, mu0 = normalization(DTR0)
+    DC1, mu1 = normalization(DTR1)
+
+    CM0 = covariance(DC0) * np.eye(DC0.shape[0])
+    CM1= covariance(DC1) * np.eye(DC1.shape[0])
+
+    Y0 = logpdf_GAU_ND(DTE, mu0, CM0)
+    Y1 = logpdf_GAU_ND(DTE, mu1, CM1)
+    LLR = Y1 - Y0
+    return LLR
+
+def applyThreshold(LLR):
+    predict = np.zeros((LLR.shape[0]), dtype = np.int32)
+
+    for i in range(LLR.shape[0]):
+        if LLR[i] >= 0:
+            predict[i] = 1
+        else:
+            predict[i] = 0
+
+    return predict
+
+def computeError(predict, LTE):
+    nCorrect = np.sum(predict == LTE)
+    accuracy = nCorrect / LTE.size
+    errorRate = 1-accuracy
+    
+    return errorRate
